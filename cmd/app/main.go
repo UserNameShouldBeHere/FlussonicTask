@@ -93,8 +93,9 @@ func startServer(pipeline *pipeline.Pipeline, backEndPort int, logger *zap.Sugar
 	router := http.NewServeMux()
 
 	router.HandleFunc("GET /job/all", tasksHandler.GetAllTasks)
-	router.HandleFunc("GET /job/{id}", tasksHandler.GetTask)
+	router.HandleFunc("GET /job/{id}/status", tasksHandler.GetTask)
 	router.HandleFunc("POST /job", tasksHandler.AddTask)
+	router.HandleFunc("POST /job/{id}/cancel", tasksHandler.CancelTask)
 
 	server := &http.Server{
 		Handler:      router,
@@ -150,9 +151,6 @@ func startPipeline(pipeline *pipeline.Pipeline, tasksCh chan domain.Task, logger
 			logger.Infoln(err)
 		}
 	}()
-
-	pipeline.Cancel(2)
-	pipeline.Cancel(5)
 
 	go func() {
 		currentId := 0
