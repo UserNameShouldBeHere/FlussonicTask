@@ -1,6 +1,7 @@
 # Flussonic task
-[![License](https://img.shields.io/github/license/UserNameShouldBeHere/FlussonicTask)](https://opensource.org/license/mit)
 [![Lang](https://img.shields.io/github/languages/top/UserNameShouldBeHere/FlussonicTask)](https://go.dev/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/UserNameShouldBeHere/FlussonicTask)](https://goreportcard.com/report/github.com/UserNameShouldBeHere/FlussonicTask)
+[![License](https://img.shields.io/github/license/UserNameShouldBeHere/FlussonicTask)](https://opensource.org/license/mit)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/UserNameShouldBeHere/FlussonicTask/go.yml)](https://img.shields.io/github/actions/workflow/status/UserNameShouldBeHere/FlussonicTask/go.yml)
 
 ## Задание
