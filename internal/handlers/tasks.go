@@ -73,14 +73,18 @@ func (h *TasksHandler) AddTask(w http.ResponseWriter, req *http.Request) {
 			Status: 500,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
-		h.logger.Errorf("error at writing response: %v", err)
+		if err != nil {
+			h.logger.Errorf("error at writing response: %v", err)
+		}
 	}
 
 	err = WriteResponse(w, ResponseData{
 		Status: 200,
 		Data:   nil,
 	})
-	h.logger.Errorf("error at writing response: %v", err)
+	if err != nil {
+		h.logger.Errorf("error at writing response: %v", err)
+	}
 }
 
 func (h *TasksHandler) CancelTask(w http.ResponseWriter, req *http.Request) {
@@ -90,7 +94,9 @@ func (h *TasksHandler) CancelTask(w http.ResponseWriter, req *http.Request) {
 			Status: 500,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
-		h.logger.Errorf("error at writing response: %v", err)
+		if err != nil {
+			h.logger.Errorf("error at writing response: %v", err)
+		}
 	}
 
 	h.pipeline.Cancel(uint16(id))
@@ -99,7 +105,9 @@ func (h *TasksHandler) CancelTask(w http.ResponseWriter, req *http.Request) {
 		Status: 200,
 		Data:   nil,
 	})
-	h.logger.Errorf("error at writing response: %v", err)
+	if err != nil {
+		h.logger.Errorf("error at writing response: %v", err)
+	}
 }
 
 type StatusResponse struct {
@@ -114,7 +122,9 @@ func (h *TasksHandler) GetTask(w http.ResponseWriter, req *http.Request) {
 			Status: 500,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
-		h.logger.Errorf("error at writing response: %v", err)
+		if err != nil {
+			h.logger.Errorf("error at writing response: %v", err)
+		}
 	}
 
 	status := h.pipeline.GetTaskStatus(uint16(id))
@@ -126,7 +136,9 @@ func (h *TasksHandler) GetTask(w http.ResponseWriter, req *http.Request) {
 			Status: ConvertStatusToStr(status),
 		},
 	})
-	h.logger.Errorf("error at writing response: %v", err)
+	if err != nil {
+		h.logger.Errorf("error at writing response: %v", err)
+	}
 }
 
 type AllStatusesResponse struct {
@@ -152,5 +164,7 @@ func (h *TasksHandler) GetAllTasks(w http.ResponseWriter, req *http.Request) {
 			Tasks: tasks,
 		},
 	})
-	h.logger.Errorf("error at writing response: %v", err)
+	if err != nil {
+		h.logger.Errorf("error at writing response: %v", err)
+	}
 }

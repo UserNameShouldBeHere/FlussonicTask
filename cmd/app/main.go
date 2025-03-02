@@ -170,6 +170,8 @@ func startPipeline(
 		for {
 			msg, err := c.ReadMessage(time.Second)
 			if err == nil {
+				logger.Debugf("recieved task №%d", currentId)
+
 				var message domain.TaskMessage
 				err := json.Unmarshal(msg.Value, &message)
 				if err != nil {
