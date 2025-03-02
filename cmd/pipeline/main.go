@@ -4,15 +4,22 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/UserNameShouldBeHere/FlussonicTask/internal/domain"
 	"github.com/UserNameShouldBeHere/FlussonicTask/internal/pipeline"
+	"github.com/UserNameShouldBeHere/FlussonicTask/internal/tasktracker"
 )
 
 func main() {
+	taskTracker, err := tasktracker.NewTaskTracker()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	tasksCh := make(chan domain.Task, 100)
-	p, err := pipeline.NewPipeline(50, 10, time.Second*3, tasksCh)
+	p, err := pipeline.NewPipeline(10, 2, time.Second*3, tasksCh, taskTracker)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -27,7 +34,7 @@ func main() {
 
 	begin := time.Now()
 	go func() {
-		for i := range 5 {
+		for i := range 10 {
 			task := domain.Task{
 				Id:  uint16(i),
 				Ttl: 2,
@@ -36,7 +43,7 @@ func main() {
 					resultCh := make(chan domain.Result, 1)
 					defer close(resultCh)
 
-					<-time.After(time.Second * 3)
+					<-time.After(time.Duration(rand.Int63n(int64(5 * time.Second))))
 
 					return domain.Result{
 						Result: nil,

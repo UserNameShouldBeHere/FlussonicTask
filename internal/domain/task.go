@@ -3,7 +3,6 @@ package domain
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
 type Result struct {
@@ -32,10 +31,8 @@ func (t *Task) Run() error {
 	}()
 
 	select {
-	case <-time.After(time.Second * 3):
-		return fmt.Errorf("task took too much time")
 	case <-t.Ctx.Done():
-		return fmt.Errorf("task was canceled")
+		return fmt.Errorf("task was canceled or took too much time")
 	case res := <-resultCh:
 		if res.Err != nil {
 			return fmt.Errorf("error recieved while executing task")
