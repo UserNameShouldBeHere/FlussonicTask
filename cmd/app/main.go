@@ -76,7 +76,7 @@ func main() {
 
 func startServer(pipeline *pipeline.Pipeline, backEndPort int, logger *zap.SugaredLogger) {
 	p, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers":  "localhost",
+		"bootstrap.servers":  "kafka",
 		"enable.idempotence": true,
 	})
 	if err != nil {
@@ -130,7 +130,7 @@ func startServer(pipeline *pipeline.Pipeline, backEndPort int, logger *zap.Sugar
 
 func startPipeline(pipeline *pipeline.Pipeline, tasksCh chan domain.Task, logger *zap.SugaredLogger) {
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost",
+		"bootstrap.servers": "kafka",
 		"group.id":          "myGroup",
 		"auto.offset.reset": "earliest",
 	})
