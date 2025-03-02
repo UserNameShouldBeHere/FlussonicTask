@@ -56,7 +56,7 @@ func (h *TasksHandler) AddTask(w http.ResponseWriter, req *http.Request) {
 	jsonMessage, err := json.Marshal(message)
 	if err != nil {
 		err = WriteResponse(w, ResponseData{
-			Status: 500,
+			Status: http.StatusInternalServerError,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
 		if err != nil {
@@ -70,7 +70,7 @@ func (h *TasksHandler) AddTask(w http.ResponseWriter, req *http.Request) {
 	}, nil)
 	if err != nil {
 		err = WriteResponse(w, ResponseData{
-			Status: 500,
+			Status: http.StatusInternalServerError,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
 		if err != nil {
@@ -79,7 +79,7 @@ func (h *TasksHandler) AddTask(w http.ResponseWriter, req *http.Request) {
 	}
 
 	err = WriteResponse(w, ResponseData{
-		Status: 200,
+		Status: http.StatusOK,
 		Data:   nil,
 	})
 	if err != nil {
@@ -91,7 +91,7 @@ func (h *TasksHandler) CancelTask(w http.ResponseWriter, req *http.Request) {
 	id, err := strconv.ParseUint(req.PathValue("id"), 10, 64)
 	if err != nil {
 		err = WriteResponse(w, ResponseData{
-			Status: 500,
+			Status: http.StatusBadRequest,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
 		if err != nil {
@@ -102,7 +102,7 @@ func (h *TasksHandler) CancelTask(w http.ResponseWriter, req *http.Request) {
 	h.pipeline.Cancel(uint16(id))
 
 	err = WriteResponse(w, ResponseData{
-		Status: 200,
+		Status: http.StatusOK,
 		Data:   nil,
 	})
 	if err != nil {
@@ -119,7 +119,7 @@ func (h *TasksHandler) GetTask(w http.ResponseWriter, req *http.Request) {
 	id, err := strconv.ParseUint(req.PathValue("id"), 10, 64)
 	if err != nil {
 		err = WriteResponse(w, ResponseData{
-			Status: 500,
+			Status: http.StatusBadRequest,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
 		if err != nil {
@@ -130,7 +130,7 @@ func (h *TasksHandler) GetTask(w http.ResponseWriter, req *http.Request) {
 	status := h.pipeline.GetTaskStatus(uint16(id))
 
 	err = WriteResponse(w, ResponseData{
-		Status: 200,
+		Status: http.StatusOK,
 		Data: StatusResponse{
 			Id:     uint16(id),
 			Status: ConvertStatusToStr(status),
@@ -159,7 +159,7 @@ func (h *TasksHandler) GetAllTasks(w http.ResponseWriter, req *http.Request) {
 	sort.Slice(tasks, func(i, j int) bool { return tasks[i].Id < tasks[j].Id })
 
 	err := WriteResponse(w, ResponseData{
-		Status: 200,
+		Status: http.StatusOK,
 		Data: AllStatusesResponse{
 			Tasks: tasks,
 		},

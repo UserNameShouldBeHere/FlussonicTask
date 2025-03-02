@@ -4,7 +4,6 @@ WORKDIR /src
 
 COPY ./.. .
 
-RUN ls
 RUN go mod tidy
 RUN go build -o app cmd/app/main.go
 
