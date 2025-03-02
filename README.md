@@ -1,3 +1,8 @@
+# Flussonic task
+[![License](https://img.shields.io/github/license/UserNameShouldBeHere/FlussonicTask)](https://opensource.org/license/mit)
+[![Lang](https://img.shields.io/github/languages/top/UserNameShouldBeHere/FlussonicTask)](https://go.dev/)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/UserNameShouldBeHere/FlussonicTask/go.yml)](https://img.shields.io/github/actions/workflow/status/UserNameShouldBeHere/FlussonicTask/go.yml)
+
 ## Задание
 [Ссылка](https://gist.github.com/hjbaa/51ce3a28f0b3dc78bb5fa130524d1726)
 
