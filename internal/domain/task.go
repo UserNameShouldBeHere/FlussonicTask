@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 type Result struct {
@@ -13,15 +14,11 @@ type Result struct {
 type TaskFunc func() Result
 
 type Task struct {
-	Id uint16
-
-	Ttl uint8
-
-	Task TaskFunc
-
-	Ctx context.Context
-
-	StopCh <-chan struct{}
+	Id     uint16
+	Ttl    uint8
+	Task   TaskFunc
+	Ctx    context.Context
+	Cancel context.CancelFunc
 }
 
 func (t *Task) Run() error {
@@ -39,4 +36,9 @@ func (t *Task) Run() error {
 		}
 		return nil
 	}
+}
+
+type TaskMessage struct {
+	Timeout time.Duration `json:"timeout"`
+	Data    string        `json:"data"`
 }

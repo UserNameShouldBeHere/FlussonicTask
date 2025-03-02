@@ -1,94 +1,197 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
+	"math/rand"
+	"net/http"
 	"os"
-	"sync"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/UserNameShouldBeHere/FlussonicTask/internal/domain"
+	"github.com/UserNameShouldBeHere/FlussonicTask/internal/handlers"
+	"github.com/UserNameShouldBeHere/FlussonicTask/internal/pipeline"
+	"github.com/UserNameShouldBeHere/FlussonicTask/internal/tasktracker"
 )
 
 func main() {
-	topic := "test"
+	var (
+		backEndPort  int
+		taskTimeout  int
+		taskWorkers  uint
+		rerunWorkers uint
+	)
 
-	wg := &sync.WaitGroup{}
+	flag.IntVar(&backEndPort, "p", 8080, "backend port")
+	flag.IntVar(&taskTimeout, "t", 3000, "task timeout in milliseconds")
+	flag.UintVar(&taskWorkers, "twrk", 10, "amount of workers for tasks")
+	flag.UintVar(&rerunWorkers, "rwrk", 10, "amount of workers for rerunning tasks")
 
-	wg.Add(1)
+	flag.Parse()
+
+	config := zap.Config{
+		Level:            zap.NewAtomicLevelAt(zapcore.DebugLevel),
+		Development:      true,
+		Encoding:         "console",
+		EncoderConfig:    zap.NewProductionEncoderConfig(),
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
+	}
+
+	logger, err := config.Build()
+	if err != nil {
+		log.Fatal(err)
+	}
+	sugarLogger := logger.Sugar()
+
+	taskTracker, err := tasktracker.NewTaskTracker()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tasksCh := make(chan domain.Task, 100)
+	p, err := pipeline.NewPipeline(
+		uint16(taskWorkers),
+		uint16(rerunWorkers),
+		time.Millisecond*time.Duration(taskTimeout),
+		tasksCh,
+		taskTracker)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go startPipeline(p, tasksCh, sugarLogger)
+
+	startServer(p, backEndPort, sugarLogger)
+}
+
+func startServer(pipeline *pipeline.Pipeline, backEndPort int, logger *zap.SugaredLogger) {
+	p, err := kafka.NewProducer(&kafka.ConfigMap{
+		"bootstrap.servers":  "localhost",
+		"enable.idempotence": true,
+	})
+	if err != nil {
+		logger.Fatalln(err)
+	}
+
+	defer p.Close()
+
+	tasksHandler, err := handlers.NewTasksHandler(p, pipeline, logger)
+	if err != nil {
+		logger.Fatalf("error in tasks handler initialization: %v", err)
+	}
+
+	router := http.NewServeMux()
+
+	router.HandleFunc("GET /job/all", tasksHandler.GetAllTasks)
+	router.HandleFunc("GET /job/{id}", tasksHandler.GetTask)
+	router.HandleFunc("POST /job", tasksHandler.AddTask)
+
+	server := &http.Server{
+		Handler:      router,
+		Addr:         fmt.Sprintf(":%d", backEndPort),
+		ReadTimeout:  time.Second,
+		WriteTimeout: time.Second,
+	}
+
+	stopped := make(chan struct{})
 	go func() {
-		defer wg.Done()
-		producerConfig := &kafka.ConfigMap{
-			"bootstrap.servers":     "localhost",
-			"acks":                  "1",
-			"request.required.acks": "1",
-			"client.id":             "myProducer",
+		defer close(stopped)
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		<-sigint
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			logger.Errorf("Server shutdown error: %v", err)
 		}
-
-		producer, err := kafka.NewProducer(producerConfig)
-		if err != nil {
-			fmt.Printf("Failed to create producer: %s\n", err)
-			os.Exit(1)
-		}
-		defer producer.Close()
-		fmt.Println("Producer initialized")
-
-		for range 50 {
-			err = producer.Produce(&kafka.Message{
-				TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-				Value:          []byte("hello"),
-			}, nil)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-
-		producer.Flush(15 * 1000)
 	}()
 
-	//!======================================
+	logger.Infof("Starting server at %s%s", "localhost", fmt.Sprintf(":%d", backEndPort))
+
+	if err := server.ListenAndServe(); err != http.ErrServerClosed {
+		logger.Fatalln(err)
+	}
+
+	<-stopped
+
+	logger.Infoln("Server stopped")
+}
+
+func startPipeline(pipeline *pipeline.Pipeline, tasksCh chan domain.Task, logger *zap.SugaredLogger) {
+	c, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers": "localhost",
+		"group.id":          "myGroup",
+		"auto.offset.reset": "earliest",
+	})
+	if err != nil {
+		logger.Fatalln(err)
+	}
+
+	err = c.SubscribeTopics([]string{"tasks"}, nil)
+	if err != nil {
+		logger.Fatalln(err)
+	}
+	defer c.Close()
+
+	errorsCh := pipeline.Run()
 
 	go func() {
-		consumerConfig := &kafka.ConfigMap{
-			"bootstrap.servers": "localhost",
-			"group.id":          "myGroup",
-			"auto.offset.reset": "smallest"}
-
-		consumer, err := kafka.NewConsumer(consumerConfig)
-		if err != nil {
-			fmt.Printf("Failed to create consumer: %s\n", err)
-			os.Exit(1)
+		for err := range errorsCh {
+			logger.Infoln(err)
 		}
-		defer consumer.Close()
-		fmt.Println("Consumer initialized")
+	}()
 
-		err = consumer.SubscribeTopics([]string{topic}, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
+	pipeline.Cancel(2)
+	pipeline.Cancel(5)
+
+	go func() {
+		currentId := 0
 
 		for {
-			msg, err := consumer.ReadMessage(time.Second)
+			msg, err := c.ReadMessage(time.Second)
 			if err == nil {
-				fmt.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
+				var message domain.TaskMessage
+				err := json.Unmarshal(msg.Value, &message)
+				if err != nil {
+					logger.Errorf("error in unmarshalling: %v", err)
+				}
+
+				ctx, cancel := context.WithTimeout(context.Background(), message.Timeout)
+
+				task := domain.Task{
+					Id:     uint16(currentId),
+					Ttl:    2,
+					Ctx:    ctx,
+					Cancel: cancel,
+					Task: func() domain.Result {
+						resultCh := make(chan domain.Result, 1)
+						defer close(resultCh)
+
+						<-time.After(time.Duration(rand.Int63n(int64(5 * time.Second))))
+
+						return domain.Result{
+							Result: message.Data,
+							Err:    nil,
+						}
+					},
+				}
+				tasksCh <- task
+				currentId++
 			} else if !err.(kafka.Error).IsTimeout() {
-				// The client will automatically try to recover from all errors.
-				// Timeout is not considered an error because it is raised by
-				// ReadMessage in absence of messages.
-				fmt.Printf("Consumer error: %v (%v)\n", err, msg)
+				logger.Errorf("Consumer error: %v (%v)", err, msg)
 			}
 		}
 	}()
 
-	wg.Wait()
-	<-time.After(time.Second * 10)
-	// retrieved := consumer.Poll(0)
-	// switch message := retrieved.(type) {
-	// case *kafka.Message:
-	// 	fmt.Println(string(message.Value))
-	// case kafka.Error:
-	// 	fmt.Printf("%% Error: %v\n", message)
-	// default:
-	// 	fmt.Printf("Ignored %v\n", message)
-	// }
+	pipeline.Wait()
 }

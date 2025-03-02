@@ -3,7 +3,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -21,6 +20,8 @@ type Pipeline struct {
 	tasksCh  chan domain.Task
 	rerunCh  chan domain.Task
 	errorsCh chan error
+
+	cancelFuncs map[uint16]context.CancelFunc
 
 	commonTimeout time.Duration
 
@@ -51,6 +52,7 @@ func NewPipeline(
 		tasksCh:           tasksCh,
 		rerunCh:           make(chan domain.Task, 100),
 		errorsCh:          make(chan error, 100),
+		cancelFuncs:       make(map[uint16]context.CancelFunc),
 		commonTimeout:     commonTimeout,
 		worksForRerun:     0,
 		taskTracker:       taskTracker,
@@ -66,7 +68,11 @@ func (p *Pipeline) Run() <-chan error {
 			defer p.wg.Done()
 
 			for newTask := range p.tasksCh {
-				log.Printf("current running: %d\n", newTask.Id)
+				ctx, cancel := context.WithTimeout(newTask.Ctx, p.commonTimeout)
+				p.cancelFuncs[newTask.Id] = cancel
+
+				newTask.Ctx = ctx
+
 				err := p.handleTask(newTask)
 				if err != nil {
 					if newTask.Ttl <= 0 {
@@ -88,7 +94,11 @@ func (p *Pipeline) Run() <-chan error {
 			defer p.rerunWg.Done()
 
 			for newTask := range p.rerunCh {
-				log.Printf("current rerunning: %d\n", newTask.Id)
+				ctx, cancel := context.WithTimeout(context.Background(), p.commonTimeout)
+				p.cancelFuncs[newTask.Id] = cancel
+
+				newTask.Ctx = ctx
+
 				err := p.handleTask(newTask)
 				if err != nil {
 					if newTask.Ttl <= 0 {
@@ -127,10 +137,12 @@ func (p *Pipeline) Run() <-chan error {
 
 func (p *Pipeline) Wait() {
 	p.rerunWg.Wait()
-	log.Println("Done")
 }
 
 func (p *Pipeline) Cancel(id uint16) {
+	if cancel, ok := p.cancelFuncs[id]; ok {
+		cancel()
+	}
 	p.taskTracker.Cancel(id)
 }
 
@@ -144,14 +156,10 @@ func (p *Pipeline) GetAllTaskStatuses() map[uint16]tasktracker.Status {
 
 func (p *Pipeline) handleTask(task domain.Task) error {
 	if status := p.taskTracker.GetStatus(task.Id); status == tasktracker.Canceled {
-		log.Printf("======= task №%d canceled =======", task.Id)
 		return nil
 	}
 
 	p.taskTracker.UpdateStatus(task.Id, tasktracker.Executing)
-
-	ctx, _ := context.WithTimeout(task.Ctx, p.commonTimeout)
-	task.Ctx = ctx
 
 	err := task.Run()
 	if err != nil {
