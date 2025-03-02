@@ -29,12 +29,14 @@ func main() {
 		taskTimeout  int
 		taskWorkers  uint
 		rerunWorkers uint
+		kafkaHost    string
 	)
 
 	flag.IntVar(&backEndPort, "p", 8080, "backend port")
 	flag.IntVar(&taskTimeout, "t", 3000, "task timeout in milliseconds")
 	flag.UintVar(&taskWorkers, "twrk", 10, "amount of workers for tasks")
 	flag.UintVar(&rerunWorkers, "rwrk", 10, "amount of workers for rerunning tasks")
+	flag.StringVar(&kafkaHost, "kh", "kafka", "kafka host (e.g. 'kafka' for Docker or 'localhost' for local runs)")
 
 	flag.Parse()
 
@@ -69,14 +71,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	go startPipeline(p, tasksCh, sugarLogger)
+	go startPipeline(p, tasksCh, kafkaHost, sugarLogger)
 
-	startServer(p, backEndPort, sugarLogger)
+	startServer(p, backEndPort, kafkaHost, sugarLogger)
 }
 
-func startServer(pipeline *pipeline.Pipeline, backEndPort int, logger *zap.SugaredLogger) {
+func startServer(
+	pipeline *pipeline.Pipeline,
+	backEndPort int,
+	kafkaHost string,
+	logger *zap.SugaredLogger) {
+
 	p, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers":  "kafka",
+		"bootstrap.servers":  kafkaHost,
 		"enable.idempotence": true,
 	})
 	if err != nil {
@@ -128,9 +135,14 @@ func startServer(pipeline *pipeline.Pipeline, backEndPort int, logger *zap.Sugar
 	logger.Infoln("Server stopped")
 }
 
-func startPipeline(pipeline *pipeline.Pipeline, tasksCh chan domain.Task, logger *zap.SugaredLogger) {
+func startPipeline(
+	pipeline *pipeline.Pipeline,
+	tasksCh chan domain.Task,
+	kafkaHost string,
+	logger *zap.SugaredLogger) {
+
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "kafka",
+		"bootstrap.servers": kafkaHost,
 		"group.id":          "myGroup",
 		"auto.offset.reset": "earliest",
 	})
