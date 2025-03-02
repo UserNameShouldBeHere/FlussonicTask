@@ -55,10 +55,13 @@ func (h *TasksHandler) AddTask(w http.ResponseWriter, req *http.Request) {
 	}
 	jsonMessage, err := json.Marshal(message)
 	if err != nil {
-		WriteResponse(w, ResponseData{
+		err = WriteResponse(w, ResponseData{
 			Status: 500,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
+		if err != nil {
+			h.logger.Errorf("error at writing response: %v", err)
+		}
 	}
 
 	err = h.p.Produce(&kafka.Message{
@@ -66,33 +69,37 @@ func (h *TasksHandler) AddTask(w http.ResponseWriter, req *http.Request) {
 		Value:          jsonMessage,
 	}, nil)
 	if err != nil {
-		WriteResponse(w, ResponseData{
+		err = WriteResponse(w, ResponseData{
 			Status: 500,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
+		h.logger.Errorf("error at writing response: %v", err)
 	}
 
-	WriteResponse(w, ResponseData{
+	err = WriteResponse(w, ResponseData{
 		Status: 200,
 		Data:   nil,
 	})
+	h.logger.Errorf("error at writing response: %v", err)
 }
 
 func (h *TasksHandler) CancelTask(w http.ResponseWriter, req *http.Request) {
 	id, err := strconv.ParseUint(req.PathValue("id"), 10, 64)
 	if err != nil {
-		WriteResponse(w, ResponseData{
+		err = WriteResponse(w, ResponseData{
 			Status: 500,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
+		h.logger.Errorf("error at writing response: %v", err)
 	}
 
 	h.pipeline.Cancel(uint16(id))
 
-	WriteResponse(w, ResponseData{
+	err = WriteResponse(w, ResponseData{
 		Status: 200,
 		Data:   nil,
 	})
+	h.logger.Errorf("error at writing response: %v", err)
 }
 
 type StatusResponse struct {
@@ -103,21 +110,23 @@ type StatusResponse struct {
 func (h *TasksHandler) GetTask(w http.ResponseWriter, req *http.Request) {
 	id, err := strconv.ParseUint(req.PathValue("id"), 10, 64)
 	if err != nil {
-		WriteResponse(w, ResponseData{
+		err = WriteResponse(w, ResponseData{
 			Status: 500,
 			Data:   ErrorResponse{Errors: err.Error()},
 		})
+		h.logger.Errorf("error at writing response: %v", err)
 	}
 
 	status := h.pipeline.GetTaskStatus(uint16(id))
 
-	WriteResponse(w, ResponseData{
+	err = WriteResponse(w, ResponseData{
 		Status: 200,
 		Data: StatusResponse{
 			Id:     uint16(id),
 			Status: ConvertStatusToStr(status),
 		},
 	})
+	h.logger.Errorf("error at writing response: %v", err)
 }
 
 type AllStatusesResponse struct {
@@ -137,10 +146,11 @@ func (h *TasksHandler) GetAllTasks(w http.ResponseWriter, req *http.Request) {
 
 	sort.Slice(tasks, func(i, j int) bool { return tasks[i].Id < tasks[j].Id })
 
-	WriteResponse(w, ResponseData{
+	err := WriteResponse(w, ResponseData{
 		Status: 200,
 		Data: AllStatusesResponse{
 			Tasks: tasks,
 		},
 	})
+	h.logger.Errorf("error at writing response: %v", err)
 }
