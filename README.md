@@ -1,6 +1,7 @@
 # Flussonic task
-[![License](https://img.shields.io/github/license/UserNameShouldBeHere/FlussonicTask)](https://opensource.org/license/mit)
 [![Lang](https://img.shields.io/github/languages/top/UserNameShouldBeHere/FlussonicTask)](https://go.dev/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/UserNameShouldBeHere/FlussonicTask)](https://goreportcard.com/report/github.com/UserNameShouldBeHere/FlussonicTask)
+[![License](https://img.shields.io/github/license/UserNameShouldBeHere/FlussonicTask)](https://opensource.org/license/mit)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/UserNameShouldBeHere/FlussonicTask/go.yml)](https://img.shields.io/github/actions/workflow/status/UserNameShouldBeHere/FlussonicTask/go.yml)
 
 ## Задание
@@ -67,6 +68,8 @@ Ttl отвечает за возможное количество перезап
 
 Task - сама функция для выполнения
 
+У каждой задачи есть свой контекст, но можно задать и единый таймаут для всех задач с помощью флага -t
+
 ## Запуск
 
 Для запуска достаточно выполнить команду `docker-compose up -d`
@@ -74,7 +77,7 @@ Task - сама функция для выполнения
 Также, можно запустить из консоли. Для этого нужно иметь запущенную кафку на пору 9092, затем выполнить команду `go run cmd/app/main.go`
 При запуске можно указать следующие флаги:
 - -p (порт, на котором запускается сервис, по умолчанию = 8080)
-- -t (таймаут, применяемый ко всем задачам, по умолчанию = 3с)
+- -t (таймаут, применяемый ко всем задачам, по умолчанию = 3000 = 3с)
 - -kh (хост кафки, для запуска в докере используется 'kafka')
 - -twrk (количество горутин для обработки задач, по умолчанию = 10)
 - -rwrk (количество горутин для обработки перезапускаемых задач, по умолчанию = 10)
