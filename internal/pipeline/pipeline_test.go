@@ -67,6 +67,65 @@ func TestRunAndGetAllStatuses(t *testing.T) {
 	}
 }
 
+func TestRunAndGetAllStatusesFailed(t *testing.T) {
+	taskTracker, err := tasktracker.NewTaskTracker()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tasksCh := make(chan domain.Task, 100)
+	p, err := NewPipeline(
+		uint16(10),
+		uint16(10),
+		time.Millisecond*500,
+		tasksCh,
+		taskTracker)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	errorsCh := p.Run()
+
+	go func() {
+		for err := range errorsCh {
+			t.Logf("unexpected error: %v", err)
+		}
+	}()
+
+	go func() {
+		for i := range 5 {
+			task := domain.Task{
+				Id:  uint16(i),
+				Ttl: 0,
+				Ctx: context.Background(),
+				Task: func() domain.Result {
+					resultCh := make(chan domain.Result, 1)
+					defer close(resultCh)
+
+					<-time.After(time.Second)
+
+					return domain.Result{
+						Result: nil,
+						Err:    nil,
+					}
+				},
+			}
+			tasksCh <- task
+		}
+		close(tasksCh)
+	}()
+
+	p.Wait()
+
+	statuses := p.GetAllTaskStatuses()
+
+	for _, status := range statuses {
+		if status != tasktracker.Failed {
+			t.Errorf("expected: %v; got: %v", tasktracker.Failed, status)
+		}
+	}
+}
+
 func TestCancelAndGetStatus(t *testing.T) {
 	taskTracker, err := tasktracker.NewTaskTracker()
 	if err != nil {
